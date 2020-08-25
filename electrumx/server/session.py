@@ -802,6 +802,19 @@ class SessionManager:
         for group in groups:
             group.retained_cost += session.cost
             group.sessions.remove(session)
+    async def address_get_balance(self, address):
+        '''Return the confirmed and unconfirmed balance of an address.'''
+        hashX = self.env.coin.address_to_hashX(address)
+        return await self.get_balance(hashX)
+
+    async def address_get_history(self, address):
+        '''Return the confirmed and unconfirmed history of an address.'''
+        hashX = self.env.coin.address_to_hashX(address)
+        return await self.confirmed_and_unconfirmed_history(hashX)
+
+    async def address_listunspent(self, address):
+        hashX = self.env.coin.address_to_hashX(address)
+        return await self.hashX_listunspent(hashX)
 
 
 class SessionBase(RPCSession):
@@ -1409,6 +1422,9 @@ class ElectrumX(SessionBase):
             'server.peers.subscribe': self.peers_subscribe,
             'server.ping': self.ping,
             'server.version': self.server_version,
+            'blockchain.address.get_balance': self.address_get_balance,
+            'blockchain.address.listunspent': self.address_listunspent,
+            'blockchain.address.get_history': self.address_get_history,
         }
 
         if ptuple >= (1, 4, 2):
