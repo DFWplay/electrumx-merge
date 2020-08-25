@@ -33,6 +33,7 @@ necessary for appropriate handling.
 from collections import namedtuple
 import re
 import struct
+import argon2m_hash
 from decimal import Decimal
 from hashlib import sha256
 
@@ -56,13 +57,13 @@ class CoinError(Exception):
 class Coin:
     '''Base class of coin hierarchy.'''
 
-    SHORTNAME = "BSV"
+    SHORTNAME = "MERGE"
     NET = "mainnet"
-    REORG_LIMIT = 200
+    REORG_LIMIT = 100
     # Not sure if these are coin-specific
     RPC_URL_REGEX = re.compile('.+@(\\[[0-9a-fA-F:]+\\]|[^:]+)(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
-    CHUNK_SIZE = 2016
+    CHUNK_SIZE = 500
     BASIC_HEADER_SIZE = 80
     STATIC_BLOCK_HEADERS = True
     SESSIONCLS = ElectrumX
@@ -73,17 +74,17 @@ class Coin:
     HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root', 'timestamp',
                      'bits', 'nonce')
     HEADER_UNPACK = struct.Struct('< I 32s 32s I I I').unpack_from
-    P2PKH_VERBYTE = bytes.fromhex("00")
-    P2SH_VERBYTES = [bytes.fromhex("05")]
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTES = [bytes.fromhex("35")]
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
-    RPC_PORT = 8332
-    WIF_BYTE = bytes.fromhex("80")
+    RPC_PORT = 52001
+    WIF_BYTE = bytes.fromhex("82")
     ENCODE_CHECK = Base58.encode_check
     DECODE_CHECK = Base58.decode_check
-    GENESIS_HASH = ('000000000019d6689c085ae165831e93'
-                    '4ff763ae46a2a6c172b3f1b60a8ce26f')
-    GENESIS_ACTIVATION = 100_000_000
+    GENESIS_HASH = ('00000e44bca505863831d65cf302884e'
+                    'af6eed296dc59088e89324bccf5d9dca')
+    GENESIS_ACTIVATION = 0
     # Peer discovery
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
@@ -122,9 +123,7 @@ class Coin:
 
     @classmethod
     def max_fetch_blocks(cls, height):
-        if height < 130000:
-            return 1000
-        return 100
+        return 500
 
     @classmethod
     def genesis_block(cls, block):
@@ -265,72 +264,21 @@ class Coin:
         return False
 
 
-class BitcoinSV(Coin):
-    NAME = "BitcoinSV"
-    TX_COUNT = 267318795
-    TX_COUNT_HEIGHT = 557037
-    TX_PER_BLOCK = 400
+class Merge(Coin):
+    NAME = "Merge"
+    TX_COUNT =  1696927
+    TX_COUNT_HEIGHT = 814500
+    TX_PER_BLOCK = 2.08
     PEERS = [
-        'electrumx.bitcoinsv.io s',
-        'satoshi.vision.cash s',
-        'sv.usebsv.com s t',
-        'sv.satoshi.io s t',
     ]
-    GENESIS_ACTIVATION = 620_538
-
-
-class BitcoinTestnetMixin:
-    SHORTNAME = "XTN"
-    NET = "testnet"
-    XPUB_VERBYTES = bytes.fromhex("043587cf")
-    XPRV_VERBYTES = bytes.fromhex("04358394")
-    P2PKH_VERBYTE = bytes.fromhex("6f")
-    P2SH_VERBYTES = [bytes.fromhex("c4")]
-    WIF_BYTE = bytes.fromhex("ef")
-    GENESIS_HASH = ('000000000933ea01ad0ee984209779ba'
-                    'aec3ced90fa3f408719526f8d77f4943')
-    REORG_LIMIT = 8000
-    TX_COUNT = 12242438
-    TX_COUNT_HEIGHT = 1035428
-    TX_PER_BLOCK = 21
-    RPC_PORT = 18332
-    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
-
-
-class BitcoinSVTestnet(BitcoinTestnetMixin, Coin):
-    '''Bitcoin Testnet for Bitcoin SV daemons.'''
-    NAME = "BitcoinSV"
-    PEERS = [
-        'electrontest.cascharia.com t51001 s51002',
-    ]
-    GENESIS_ACTIVATION = 1_344_302
-
-
-class BitcoinSVScalingTestnet(BitcoinSVTestnet):
-    NET = "scalingtest"
-    PEERS = [
-        'stn-server.electrumsv.io t51001 s51002',
-    ]
-    TX_COUNT = 2015
-    TX_COUNT_HEIGHT = 5711
-    TX_PER_BLOCK = 5000
-    GENESIS_ACTIVATION = 14_896
+    RPC_PORT=52001
 
     @classmethod
-    def max_fetch_blocks(cls, height):
-        if height <= 10:
-            return 100
-        return 3
+    def header_hash(cls, header):
+        ''' nonce of all zeroes indicates a pos block. '''
+        if b'00000000' in header[76:79]:
+            return double_sha256(header)
+        else:
+            return argon2m_hash.getPoWHash(header)
 
-
-class BitcoinSVRegtest(BitcoinSVTestnet):
-    NET = "regtest"
-    GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
-                    'bf5beb436012afca590b1a11466e2206')
-    PEERS = []
-    TX_COUNT = 1
-    TX_COUNT_HEIGHT = 1
-    GENESIS_ACTIVATION = 10_000
-
-
-Bitcoin = BitcoinSV
+Bitcoin = Merge
