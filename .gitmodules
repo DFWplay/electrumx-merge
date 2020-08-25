@@ -1,0 +1,3 @@
+[submodule "argon2m_hash"]
+	path = argon2m_hash
+	url = https://github.com/ProjectMerge/argon2m_hash
